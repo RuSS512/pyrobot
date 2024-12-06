@@ -31,7 +31,7 @@ def save_message(client, message):
         INSERT OR REPLACE INTO messages (message_id, chat_id, user_id, text) 
         VALUES (?, ?, ?, ?)
         """, (
-            message.message_id,
+            message.id,  # Исправлено
             message.chat.id,
             message.from_user.id if message.from_user else None,
             message.text or ""
@@ -46,11 +46,11 @@ def save_message(client, message):
 def handle_deleted_messages(client, messages):
     for message in messages:
         try:
-            cursor.execute("SELECT text FROM messages WHERE message_id = ?", (message.message_id,))
+            cursor.execute("SELECT text FROM messages WHERE message_id = ?", (message.id,))  # Исправлено
             row = cursor.fetchone()
             if row:
                 print(f"Удалено сообщение: {row[0]}")  # Логируем удалённое сообщение
-            cursor.execute("DELETE FROM messages WHERE message_id = ?", (message.message_id,))
+            cursor.execute("DELETE FROM messages WHERE message_id = ?", (message.id,))  # Исправлено
             conn.commit()
         except Exception as e:
             print(f"Ошибка при обработке удаления сообщения: {e}")
