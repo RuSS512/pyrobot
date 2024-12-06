@@ -24,30 +24,30 @@ client = Client(
 )
 
 # Функция для получения удалённых сообщений
-def get_deleted_messages(channel_id):
+def get_deleted_messages(client, channel_id):
     try:
-        with client:
-            result = client.invoke(
-                GetAdminLog(
-                    channel=client.resolve_peer(channel_id),
-                    q="",
-                    max_id=0,
-                    min_id=0,
-                    limit=1000
-                )
+        result = client.invoke(
+            GetAdminLog(
+                channel=client.resolve_peer(channel_id),
+                q="",
+                max_id=0,
+                min_id=0,
+                limit=1000
             )
-            for event in result.events:
-                if isinstance(event.action, ChannelAdminLogEventActionDeleteMessage):
-                    deleted_message = event.action.message
-                    if deleted_message and deleted_message.message:
-                        print(f"Удалённое сообщение: {deleted_message.message}")
-                    else:
-                        print("Удалённое сообщение было пустым или не найдено.")
+        )
+        for event in result.events:
+            if isinstance(event.action, ChannelAdminLogEventActionDeleteMessage):
+                deleted_message = event.action.message
+                if deleted_message and deleted_message.message:
+                    print(f"Удалённое сообщение: {deleted_message.message}")
+                else:
+                    print("Удалённое сообщение было пустым или не найдено.")
     except Exception as e:
         print(f"Ошибка: {e}")
 
 # Основной запуск
 if __name__ == "__main__":
-    with client:
-        print("Бот запущен!")
-        get_deleted_messages(channel)
+    print("Бот запущен!")
+    client.start()  # Явно подключаем клиента
+    get_deleted_messages(client, channel)
+    client.stop()  # Явно отключаем клиента
