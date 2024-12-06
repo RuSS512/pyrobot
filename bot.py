@@ -1,53 +1,61 @@
-from pyrogram import Client
-from pyrogram.raw.functions.channels import GetAdminLog
-from pyrogram.raw.types import ChannelAdminLogEventActionDeleteMessage
-from dotenv import load_dotenv
+from pyrogram import Client, filters
+import sqlite3
 import os
 
-# Загрузка переменных окружения
-load_dotenv()
+# Переменные окружения
+API_ID = int(os.getenv("API_ID"))
+API_HASH = os.getenv("API_HASH")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-API_ID = int(os.getenv("API_ID"))  # Ваш API ID
-API_HASH = os.getenv("API_HASH")  # Ваш API Hash
-BOT_TOKEN = os.getenv("BOT_TOKEN")  # Ваш токен бота
-channel = os.getenv("CHANNEL_ID")  # Получаем ID или username канала
+# Инициализация бота
+client = Client("bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
-if not channel:
-    raise ValueError("Переменная окружения CHANNEL_ID не задана!")
-
-# Инициализация клиента
-client = Client(
-    "client",
-    api_id=API_ID,
-    api_hash=API_HASH,
-    bot_token=BOT_TOKEN
+# Настройка базы данных
+conn = sqlite3.connect("messages.db")  # Создаётся локальная база данных messages.db
+cursor = conn.cursor()
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS messages (
+    message_id INTEGER PRIMARY KEY,  -- Уникальный идентификатор сообщения
+    chat_id INTEGER,                 -- Идентификатор группы/канала
+    user_id INTEGER,                 -- Идентификатор отправителя
+    text TEXT                        -- Текст сообщения
 )
+""")
+conn.commit()
 
-# Функция для получения удалённых сообщений
-def get_deleted_messages(client, channel_id):
+# Сохранение входящих сообщений в базу данных
+@client.on_message(filters.group & ~filters.service)
+def save_message(client, message):
     try:
-        result = client.invoke(
-            GetAdminLog(
-                channel=client.resolve_peer(channel_id),
-                q="",
-                max_id=0,
-                min_id=0,
-                limit=1000
-            )
-        )
-        for event in result.events:
-            if isinstance(event.action, ChannelAdminLogEventActionDeleteMessage):
-                deleted_message = event.action.message
-                if deleted_message and deleted_message.message:
-                    print(f"Удалённое сообщение: {deleted_message.message}")
-                else:
-                    print("Удалённое сообщение было пустым или не найдено.")
+        cursor.execute("""
+        INSERT OR REPLACE INTO messages (message_id, chat_id, user_id, text) 
+        VALUES (?, ?, ?, ?)
+        """, (
+            message.message_id,
+            message.chat.id,
+            message.from_user.id if message.from_user else None,
+            message.text or ""
+        ))
+        conn.commit()
+        print(f"Сохранено сообщение: {message.text}")
     except Exception as e:
-        print(f"Ошибка: {e}")
+        print(f"Ошибка при сохранении сообщения: {e}")
 
-# Основной запуск
+# Обработка удаления сообщений
+@client.on_deleted_messages(filters.group)
+def handle_deleted_messages(client, messages):
+    for message in messages:
+        try:
+            cursor.execute("SELECT text FROM messages WHERE message_id = ?", (message.message_id,))
+            row = cursor.fetchone()
+            if row:
+                print(f"Удалено сообщение: {row[0]}")  # Логируем удалённое сообщение
+            cursor.execute("DELETE FROM messages WHERE message_id = ?", (message.message_id,))
+            conn.commit()
+        except Exception as e:
+            print(f"Ошибка при обработке удаления сообщения: {e}")
+
+# Запуск бота
 if __name__ == "__main__":
-    print("Бот запущен!")
-    client.start()  # Явно подключаем клиента
-    get_deleted_messages(client, channel)
-    client.stop()  # Явно отключаем клиента
+    print("Бот запущен и готов к работе!")
+    client.run()
