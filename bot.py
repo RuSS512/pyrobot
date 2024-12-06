@@ -49,7 +49,7 @@ def save_message(client, message):
             text
         ))
         db.commit()
-        print(f"Сохранено сообщение: {text}")
+        print(f"Сохранено сообщение от пользователя {message.from_user.first_name if message.from_user else 'Неизвестный'}: {text}")
     except Exception as e:
         print(f"Ошибка при сохранении сообщения: {e}")
 
@@ -57,9 +57,9 @@ def save_message(client, message):
 @client.on_deleted_messages(filters.group)
 def handle_deleted_messages(client, messages):
     try:
-        print(f"Удалено сообщений: {len(messages)}")  # Показываем количество удалённых сообщений
+        print(f"Обработчик удаления сообщений сработал: удалено {len(messages)} сообщений.")
         for message in messages:
-            print(f"ID удалённого сообщения: {message.id}")  # Логируем ID удалённого сообщения
+            print(f"ID удалённого сообщения: {message.id}")
             
             db = get_db_connection()
             cursor = db.cursor()
@@ -67,6 +67,8 @@ def handle_deleted_messages(client, messages):
             row = cursor.fetchone()
             if row:
                 print(f"Удалено сообщение: {row[0]}")  # Логируем текст удалённого сообщения
+            else:
+                print(f"Удалённое сообщение с ID {message.id} не найдено в базе.")
             cursor.execute("DELETE FROM messages WHERE message_id = ?", (message.id,))
             db.commit()
     except Exception as e:
