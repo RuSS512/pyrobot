@@ -2,4 +2,3 @@ pyrogram
 python-dotenv
 redislite
 TgCrypto
-sqlite3
