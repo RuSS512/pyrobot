@@ -36,37 +36,41 @@ def get_db_connection():
 @client.on_message(filters.group & ~filters.service)
 def save_message(client, message):
     try:
+        text = message.text or "[Без текста]"  # Если текста нет, подставляем "[Без текста]"
         db = get_db_connection()
         cursor = db.cursor()
         cursor.execute("""
         INSERT OR REPLACE INTO messages (message_id, chat_id, user_id, text) 
         VALUES (?, ?, ?, ?)
         """, (
-            message.id,  # Исправлено
+            message.id,
             message.chat.id,
             message.from_user.id if message.from_user else None,
-            message.text or ""
+            text
         ))
         db.commit()
-        print(f"Сохранено сообщение: {message.text}")
+        print(f"Сохранено сообщение: {text}")
     except Exception as e:
         print(f"Ошибка при сохранении сообщения: {e}")
 
-# Обработка удаления сообщений
+# Обработка удаления сообщений с отладкой
 @client.on_deleted_messages(filters.group)
 def handle_deleted_messages(client, messages):
-    for message in messages:
-        try:
+    try:
+        print(f"Удалено сообщений: {len(messages)}")  # Показываем количество удалённых сообщений
+        for message in messages:
+            print(f"ID удалённого сообщения: {message.id}")  # Логируем ID удалённого сообщения
+            
             db = get_db_connection()
             cursor = db.cursor()
-            cursor.execute("SELECT text FROM messages WHERE message_id = ?", (message.id,))  # Исправлено
+            cursor.execute("SELECT text FROM messages WHERE message_id = ?", (message.id,))
             row = cursor.fetchone()
             if row:
-                print(f"Удалено сообщение: {row[0]}")  # Логируем удалённое сообщение
-            cursor.execute("DELETE FROM messages WHERE message_id = ?", (message.id,))  # Исправлено
+                print(f"Удалено сообщение: {row[0]}")  # Логируем текст удалённого сообщения
+            cursor.execute("DELETE FROM messages WHERE message_id = ?", (message.id,))
             db.commit()
-        except Exception as e:
-            print(f"Ошибка при обработке удаления сообщения: {e}")
+    except Exception as e:
+        print(f"Ошибка при обработке удаления сообщения: {e}")
 
 # Запуск бота
 if __name__ == "__main__":
