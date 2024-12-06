@@ -10,6 +10,10 @@ load_dotenv()
 API_ID = int(os.getenv("API_ID"))  # Ваш API ID
 API_HASH = os.getenv("API_HASH")  # Ваш API Hash
 BOT_TOKEN = os.getenv("BOT_TOKEN")  # Ваш токен бота
+channel = os.getenv("CHANNEL_ID")  # Получаем ID или username канала
+
+if not channel:
+    raise ValueError("Переменная окружения CHANNEL_ID не задана!")
 
 # Инициализация клиента
 client = Client(
@@ -46,5 +50,4 @@ def get_deleted_messages(channel_id):
 if __name__ == "__main__":
     with client:
         print("Бот запущен!")
-        channel = input("Введите ID или username канала: ")
         get_deleted_messages(channel)
