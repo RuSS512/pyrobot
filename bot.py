@@ -2,29 +2,26 @@ from pyrogram import Client, filters
 import sqlite3
 import os
 import threading
+import time
 
-# Переменные окружения
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-# Инициализация бота
 client = Client("bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
-# Настройка базы данных с параметром check_same_thread=False
 conn = sqlite3.connect("messages.db", check_same_thread=False)
 cursor = conn.cursor()
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS messages (
-    message_id INTEGER PRIMARY KEY,  -- Уникальный идентификатор сообщения
-    chat_id INTEGER,                 -- Идентификатор группы/канала
-    user_id INTEGER,                 -- Идентификатор отправителя
-    text TEXT                        -- Текст сообщения
+    message_id INTEGER PRIMARY KEY,
+    chat_id INTEGER,
+    user_id INTEGER,
+    text TEXT
 )
 """)
 conn.commit()
 
-# Локальные объекты для работы с потоками
 thread_local = threading.local()
 
 def get_db_connection():
@@ -32,15 +29,14 @@ def get_db_connection():
         thread_local.db = sqlite3.connect("messages.db", check_same_thread=False)
     return thread_local.db
 
-# Сохранение входящих сообщений в базу данных
 @client.on_message(filters.group & ~filters.service)
 def save_message(client, message):
     try:
-        text = message.text or "[Без текста]"  # Если текста нет, подставляем "[Без текста]"
+        text = message.text or "[Без текста]"
         db = get_db_connection()
         cursor = db.cursor()
         cursor.execute("""
-        INSERT OR REPLACE INTO messages (message_id, chat_id, user_id, text) 
+        INSERT OR REPLACE INTO messages (message_id, chat_id, user_id, text)
         VALUES (?, ?, ?, ?)
         """, (
             message.id,
@@ -49,33 +45,27 @@ def save_message(client, message):
             text
         ))
         db.commit()
-        print(f"Сохранено сообщение от пользователя {message.from_user.first_name if message.from_user else 'Неизвестный'}: {text}")
+        print(f"Сохранено сообщение: {text}")
     except Exception as e:
         print(f"Ошибка при сохранении сообщения: {e}")
 
-# Обработка удаления сообщений с отладкой
-@client.on_deleted_messages(filters.group)
-def handle_deleted_messages(client, messages):
-    try:
-        print("Обработчик удаления сообщений сработал.")
-        print(f"Количество удалённых сообщений: {len(messages)}")
-        for message in messages:
-            print(f"Удалено сообщение с ID: {message.id}")
-            
-            db = get_db_connection()
-            cursor = db.cursor()
-            cursor.execute("SELECT text FROM messages WHERE message_id = ?", (message.id,))
-            row = cursor.fetchone()
-            if row:
-                print(f"Удалено сообщение: {row[0]}")  # Логируем текст удалённого сообщения
-            else:
-                print(f"Удалённое сообщение с ID {message.id} не найдено в базе.")
-            cursor.execute("DELETE FROM messages WHERE message_id = ?", (message.id,))
-            db.commit()
-    except Exception as e:
-        print(f"Ошибка при обработке удаления сообщения: {e}")
+def check_for_deleted_messages():
+    while True:
+        time.sleep(30)  # Проверка каждые 30 секунд
+        db = get_db_connection()
+        cursor = db.cursor()
+        cursor.execute("SELECT message_id, text FROM messages")
+        all_messages = cursor.fetchall()
+        for message_id, text in all_messages:
+            try:
+                # Проверяем, существует ли сообщение в Telegram
+                client.get_messages(chat_id, message_ids=message_id)
+            except:
+                print(f"Сообщение удалено: {text}")
+                cursor.execute("DELETE FROM messages WHERE message_id = ?", (message_id,))
+                db.commit()
 
-# Запуск бота
 if __name__ == "__main__":
-    print("Бот запущен и готов к работе!")
+    print("Бот запущен!")
+    threading.Thread(target=check_for_deleted_messages, daemon=True).start()
     client.run()
