@@ -57,9 +57,10 @@ def save_message(client, message):
 @client.on_deleted_messages(filters.group)
 def handle_deleted_messages(client, messages):
     try:
-        print(f"Обработчик удаления сообщений сработал: удалено {len(messages)} сообщений.")
+        print("Обработчик удаления сообщений сработал.")
+        print(f"Количество удалённых сообщений: {len(messages)}")
         for message in messages:
-            print(f"ID удалённого сообщения: {message.id}")
+            print(f"Удалено сообщение с ID: {message.id}")
             
             db = get_db_connection()
             cursor = db.cursor()
