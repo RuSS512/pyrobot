@@ -52,7 +52,7 @@ def save_message(client, message):
     except Exception as e:
         print(f"Ошибка при сохранении сообщения: {e}")
 
-# Проверка удаленных сообщений
+# Проверка существования сообщений
 def check_for_deleted_messages():
     while True:
         time.sleep(30)  # Проверка каждые 30 секунд
@@ -64,10 +64,12 @@ def check_for_deleted_messages():
             try:
                 # Проверяем существование сообщения
                 message = client.get_messages(chat_id, message_ids=message_id)
-                if not message:  # Если Telegram не вернул сообщение
-                    raise ValueError("Сообщение не найдено")
-            except Exception:
-                print(f"Сообщение удалено: {text}")
+                if not message or message.empty:  # Проверяем, вернулся ли пустой объект
+                    print(f"Сообщение удалено: {text}")
+                    cursor.execute("DELETE FROM messages WHERE message_id = ?", (message_id,))
+                    db.commit()
+            except Exception as e:
+                print(f"Ошибка при проверке сообщения {message_id}: {e}")
                 cursor.execute("DELETE FROM messages WHERE message_id = ?", (message_id,))
                 db.commit()
 
