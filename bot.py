@@ -4,12 +4,14 @@ import os
 import threading
 import time
 
+# Переменные окружения
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 client = Client("bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
+# Настройка базы данных
 conn = sqlite3.connect("messages.db", check_same_thread=False)
 cursor = conn.cursor()
 cursor.execute("""
@@ -29,6 +31,7 @@ def get_db_connection():
         thread_local.db = sqlite3.connect("messages.db", check_same_thread=False)
     return thread_local.db
 
+# Сохранение сообщений
 @client.on_message(filters.group & ~filters.service)
 def save_message(client, message):
     try:
@@ -49,18 +52,21 @@ def save_message(client, message):
     except Exception as e:
         print(f"Ошибка при сохранении сообщения: {e}")
 
+# Проверка удаленных сообщений
 def check_for_deleted_messages():
     while True:
         time.sleep(30)  # Проверка каждые 30 секунд
         db = get_db_connection()
         cursor = db.cursor()
-        cursor.execute("SELECT message_id, text FROM messages")
+        cursor.execute("SELECT message_id, chat_id, text FROM messages")
         all_messages = cursor.fetchall()
-        for message_id, text in all_messages:
+        for message_id, chat_id, text in all_messages:
             try:
-                # Проверяем, существует ли сообщение в Telegram
-                client.get_messages(chat_id, message_ids=message_id)
-            except:
+                # Проверяем существование сообщения
+                message = client.get_messages(chat_id, message_ids=message_id)
+                if not message:  # Если Telegram не вернул сообщение
+                    raise ValueError("Сообщение не найдено")
+            except Exception:
                 print(f"Сообщение удалено: {text}")
                 cursor.execute("DELETE FROM messages WHERE message_id = ?", (message_id,))
                 db.commit()
